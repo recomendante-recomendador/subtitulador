@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Reproductor de Letras Sincronizadas</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600&family=Poppins:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --font-lyrics: 'Outfit', 'Google Sans', sans-serif;
+    --font-ui: 'Plus Jakarta Sans', 'Google Sans', sans-serif;
+
+    --color-text: #ffffff;
+    --color-text-dim: rgba(255, 255, 255, 0.32);
+    --color-glow: rgba(255, 255, 255, 0.55);
+
+    --panel-bg: rgba(18, 18, 22, 0.46);
+    --panel-border: rgba(255, 255, 255, 0.14);
+    --panel-blur: 22px;
+
+    --control-bg: rgba(255, 255, 255, 0.08);
+    --control-bg-hover: rgba(255, 255, 255, 0.16);
+    --control-border: rgba(255, 255, 255, 0.16);
+
+    --accent: #f2c879;
+
+    --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #1c1c22 0%, #050505 75%);
+    font-family: var(--font-ui);
+  }
+
+  /* ---------- Fondo ---------- */
+  #backgroundLayer{
+    position: fixed;
+    inset: -20px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(3px) brightness(0.4);
+    transform: translate(0px, 0px) scale(1.01);
+    z-index: 0;
+    transition: filter 0.15s ease, transform 0.15s ease;
+  }
+
+  #backgroundLayer.empty{
+    background: radial-gradient(ellipse at center, #1c1c22 0%, #050505 75%);
+  }
+
+  /* ---------- Contenedor de letras ---------- */
+  #lyricsViewport{
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0%, black 32%, black 68%, transparent 100%);
+    mask-image: linear-gradient(to bottom,
+      transparent 0%, black 32%, black 68%, transparent 100%);
+  }
+
+  #lyricsList{
+    width: min(88vw, 640px);
+    padding: 50vh 0;
+    transition: transform 0.65s var(--ease-smooth);
+    will-change: transform;
+  }
+
+  .lyric-line{
+    font-family: var(--font-lyrics);
+    font-weight: 300;
+    font-size: clamp(0.85rem, 3.8vmin, 2.05rem);
+    line-height: 1.22;
+    text-align: center;
+    color: var(--color-text);
+    opacity: 0.32;
+    filter: blur(1px);
+    transform: scale(1);
+    padding: 0.45em 0.4em;
+    transition: opacity 0.45s var(--ease-smooth),
+                filter 0.45s var(--ease-smooth),
+                transform 0.45s var(--ease-smooth),
+                text-shadow 0.45s var(--ease-smooth);
+    letter-spacing: -0.01em;
+  }
+
+  .lyric-line.active{
+    opacity: 1;
+    filter: blur(0);
+    font-weight: 400;
+    transform: scale(1.05);
+    text-shadow: 0 0 22px var(--color-glow), 0 0 2px rgba(255,255,255,0.3);
+  }
+
+  /* Texto español dentro de una línea bilingüe */
+  .line-es{
+    display: block;
+  }
+
+  /* Texto en idioma original: secundario, más chico, más tenue */
+  .line-original{
+    display: block;
+    font-weight: 100;
+    font-size: 0.82em;
+    color: rgba(255, 255, 255, 0.55);
+    margin-top: 0.05em;   /* interlineado corto respecto a la línea en español */
+    margin-bottom: 0.28em; /* espacio extra antes de la siguiente estrofa */
+    letter-spacing: 0;
+  }
+
+  .lyric-line.active .line-original{
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  /* Línea vacía de relleno (limpia el resaltado sin mostrar nada) */
+  .lyric-line.spacer{
+    opacity: 0 !important;
+    filter: none !important;
+    transform: none !important;
+    text-shadow: none !important;
+    pointer-events: none;
+  }
+
+  /* ---------- Bloque de metadatos + barra de progreso (fijo, bajo la línea activa) ---------- */
+  #trackInfoBlock{
+    position: fixed;
+    left: 50%;
+    top: 50%; /* se recalcula en JS: centro del visor + 3 líneas */
+    transform: translateX(-50%);
+    z-index: 2;
+    width: min(85vw, 620px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #trackMeta{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+  }
+
+  #trackTitle{
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: clamp(0.78rem, 2.5vmin, 1.02rem);
+    color: var(--color-text);
+    letter-spacing: -0.005em;
+  }
+
+  #trackArtist{
+    font-family: var(--font-ui);
+    font-weight: 400;
+    font-size: clamp(0.68rem, 2vmin, 0.85rem);
+    color: var(--color-text);
+    opacity: 0.65;
+  }
+
+  #trackTitle.hidden-meta,
+  #trackArtist.hidden-meta{ display: none; }
+
+  #progressBarWrap{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 82%;
+  }
+
+  #progressTime,
+  #progressDuration{
+    font-family: var(--font-ui);
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-text);
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+  }
+  #progressTime{ text-align: right; }
+  #progressDuration{ text-align: left; }
+
+  #progressTrack{
+    position: relative;
+    flex: 1;
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+  }
+
+  #progressFill{
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    border-radius: 3px;
+    background: #f7f5f0;
+    box-shadow: 0 0 6px rgba(247, 245, 240, 0.35);
+  }
+
+  /* ---------- Barra flotante de control de tiempo (arriba) ---------- */
+  #timeBar{
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+    backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.3);
+    /* Este botón se mantiene visible aunque el panel principal esté oculto */
+  }
+
+  .time-btn{
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text);
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 999px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    -webkit-user-select: none;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .time-btn:active{ transform: scale(0.94); }
+  .time-btn:hover{ background: var(--control-bg-hover); }
+
+  .play-btn{
+    font-family: var(--font-ui);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #221a08;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 7px 20px;
+    min-width: 52px;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.15s ease;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .play-btn:active{ transform: scale(0.94); }
+  .play-btn:hover{ filter: brightness(1.06); }
+
+  /* ---------- Panel de control flotante ---------- */
+  #controlPanel{
+    position: fixed;
+    left: 50%;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 10;
+    width: min(92vw, 420px);
+    max-height: 78vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 22px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+    backdrop-filter: blur(var(--panel-blur)) saturate(140%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  #controlPanel.hidden{
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(14px);
+  }
+
+  .panel-title{
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.45);
+    margin: 4px 2px 0;
+    font-weight: 600;
+  }
+
+  .row{ display: flex; gap: 8px; }
+
+  .ctrl-btn{
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: var(--color-text);
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    padding: 11px 10px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .ctrl-btn:active{ transform: scale(0.97); }
+  .ctrl-btn:hover{ background: var(--control-bg-hover); }
+
+  .ctrl-btn.primary{
+    background: var(--accent);
+    color: #221a08;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .ctrl-btn.primary:hover{ filter: brightness(1.05); }
+
+  input[type="file"]{ display: none; }
+
+  audio{
+    display: block;
+    width: 100%;
+    height: 36px;
+    border-radius: 10px;
+    accent-color: var(--accent);
+    opacity: 1;
+    transition: opacity 0.2s ease;
+  }
+
+  audio.audio-empty{
+    display: none;
+  }
+
+  textarea{
+    width: 100%;
+    min-height: 220px;
+    max-height: 380px;
+    resize: vertical;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    color: rgba(255,255,255,0.88);
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    padding: 10px;
+    outline: none;
+  }
+  textarea:focus{ border-color: rgba(255,255,255,0.35); }
+
+  #recordModeBtn{
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  /* Switch de modo bilingüe */
+  .switch-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .switch-row span{
+    font-size: 0.86rem;
+    color: var(--color-text);
+  }
+
+  .switch{
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input{
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .switch-track{
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.18);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .switch-track::before{
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+  }
+  .switch input:checked + .switch-track{
+    background: var(--accent);
+  }
+  .switch input:checked + .switch-track::before{
+    transform: translateX(18px);
+  }
+
+  /* Selector de fuente de letra (barrita segmentada) */
+  .font-switcher{
+    display: flex;
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .font-option{
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.68);
+    font-family: var(--font-ui);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 9px 4px;
+    border-radius: 9px;
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.2s ease, color 0.2s ease;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .font-option:hover{ background: var(--control-bg-hover); }
+  .font-option:active{ transform: scale(0.97); }
+  .font-option.active{
+    background: var(--accent);
+    color: #221a08;
+  }
+
+  /* Sliders de ajuste de fondo */
+  .slider-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--control-bg);
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    padding: 9px 12px;
+  }
+
+  .slider-row label{
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.75);
+    min-width: 58px;
+    flex-shrink: 0;
+  }
+
+  .slider-row input[type="range"]{
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+    cursor: pointer;
+  }
+
+  .slider-row .slider-value{
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.5);
+    min-width: 46px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* Tap-to-reveal hint */
+  #tapHint{
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  @media (min-width: 700px){
+    #controlPanel{ width: min(70vw, 460px); }
+  }
+</style>
+</head>
+<body>
+
+  <div id="backgroundLayer" class="empty"></div>
+
+  <div id="lyricsViewport">
+    <div id="lyricsList"></div>
+  </div>
+
+  <div id="trackInfoBlock">
+    <div id="trackMeta">
+      <div id="trackTitle"></div>
+      <div id="trackArtist"></div>
+    </div>
+    <div id="progressBarWrap">
+      <span id="progressTime">00:00</span>
+      <div id="progressTrack"><div id="progressFill"></div></div>
+      <span id="progressDuration">00:00</span>
+    </div>
+  </div>
+
+  <div id="tapHint"></div>
+
+  <div id="timeBar">
+    <button class="time-btn" id="back5Btn">-5s</button>
+    <button class="time-btn" id="back1Btn">-1s</button>
+    <button class="play-btn" id="playPauseBtn">▶</button>
+    <button class="time-btn" id="fwd1Btn">+1s</button>
+    <button class="time-btn" id="fwd5Btn">+5s</button>
+  </div>
+
+  <div id="controlPanel">
+    <div class="panel-title">Audio</div>
+    <div class="row">
+      <label class="ctrl-btn" for="audioInput">🎵 Cargar audio</label>
+      <input type="file" id="audioInput" accept="audio/*">
+    </div>
+    <audio id="player" class="audio-empty" controls></audio>
+
+    <div class="panel-title">Fondo</div>
+    <div class="row">
+      <label class="ctrl-btn" for="bgInput">🖼️ Cargar imagen de fondo</label>
+      <input type="file" id="bgInput" accept="image/*">
+    </div>
+
+    <div class="panel-title">Ajustes de Fondo</div>
+    <div class="slider-row">
+      <label for="bgScale">Escala</label>
+      <input type="range" id="bgScale" min="0.5" max="2" step="0.01" value="1.01">
+      <span class="slider-value" id="bgScaleVal">1.01</span>
+    </div>
+    <div class="slider-row">
+      <label for="bgPosX">Posición X</label>
+      <input type="range" id="bgPosX" min="-200" max="200" step="1" value="0">
+      <span class="slider-value" id="bgPosXVal">0px</span>
+    </div>
+    <div class="slider-row">
+      <label for="bgPosY">Posición Y</label>
+      <input type="range" id="bgPosY" min="-200" max="200" step="1" value="0">
+      <span class="slider-value" id="bgPosYVal">0px</span>
+    </div>
+    <div class="slider-row">
+      <label for="bgBrightness">Brillo</label>
+      <input type="range" id="bgBrightness" min="0.1" max="1.5" step="0.01" value="0.4">
+      <span class="slider-value" id="bgBrightnessVal">0.40</span>
+    </div>
+    <div class="slider-row">
+      <label for="bgBlur">Desenfoque</label>
+      <input type="range" id="bgBlur" min="0" max="20" step="0.5" value="3">
+      <span class="slider-value" id="bgBlurVal">3px</span>
+    </div>
+
+    <div class="panel-title">Fuente de Letra</div>
+    <div class="font-switcher" id="fontSwitcher">
+      <button type="button" class="font-option active" data-font="outfit">Outfit</button>
+      <button type="button" class="font-option" data-font="times">Times</button>
+      <button type="button" class="font-option" data-font="googlesans">Google Sans</button>
+      <button type="button" class="font-option" data-font="chivomono">Chivo Mono</button>
+    </div>
+
+    <div class="panel-title">Letra (.lrc)</div>
+    <textarea id="lrcInput" spellcheck="false" placeholder="[00:12.50]Pega aquí tu letra en formato LRC..."></textarea>
+    <div class="row">
+      <button class="ctrl-btn primary" id="loadLyricsBtn">Cargar Letra</button>
+    </div>
+
+    <div class="switch-row">
+      <span>🌐 Modo bilingüe (detectar *original*)</span>
+      <label class="switch">
+        <input type="checkbox" id="bilingualToggle" checked>
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <button class="ctrl-btn" id="recordModeBtn">🎬 Ocultar Controles para Grabar</button>
+  </div>
+
+<script>
+(function(){
+  const backgroundLayer = document.getElementById('backgroundLayer');
+  const lyricsList = document.getElementById('lyricsList');
+  const lyricsViewport = document.getElementById('lyricsViewport');
+  const audioInput = document.getElementById('audioInput');
+  const bgInput = document.getElementById('bgInput');
+  const lrcInput = document.getElementById('lrcInput');
+  const loadLyricsBtn = document.getElementById('loadLyricsBtn');
+  const recordModeBtn = document.getElementById('recordModeBtn');
+  const panel = document.getElementById('controlPanel');
+  const player = document.getElementById('player');
+  const bilingualToggle = document.getElementById('bilingualToggle');
+  const back5Btn = document.getElementById('back5Btn');
+  const back1Btn = document.getElementById('back1Btn');
+  const fwd1Btn = document.getElementById('fwd1Btn');
+  const fwd5Btn = document.getElementById('fwd5Btn');
+  const playPauseBtn = document.getElementById('playPauseBtn');
+
+  const trackInfoBlock = document.getElementById('trackInfoBlock');
+  const trackTitleEl = document.getElementById('trackTitle');
+  const trackArtistEl = document.getElementById('trackArtist');
+  const progressTimeEl = document.getElementById('progressTime');
+  const progressDurationEl = document.getElementById('progressDuration');
+  const progressFillEl = document.getElementById('progressFill');
+
+  const fontSwitcher = document.getElementById('fontSwitcher');
+
+  const bgScaleInput = document.getElementById('bgScale');
+  const bgPosXInput = document.getElementById('bgPosX');
+  const bgPosYInput = document.getElementById('bgPosY');
+  const bgBrightnessInput = document.getElementById('bgBrightness');
+  const bgBlurInput = document.getElementById('bgBlur');
+  const bgScaleVal = document.getElementById('bgScaleVal');
+  const bgPosXVal = document.getElementById('bgPosXVal');
+  const bgPosYVal = document.getElementById('bgPosYVal');
+  const bgBrightnessVal = document.getElementById('bgBrightnessVal');
+  const bgBlurVal = document.getElementById('bgBlurVal');
+
+  const LRC_STORAGE_KEY = 'lyricsPlayer.savedLrc';
+
+  let lyricsData = [];
+  let currentActiveIndex = -1;
+
+  // ---------- LRC precargado de ejemplo ----------
+  const EXAMPLE_LRC = `[00:00.50]Pega el texto de tu archivo .lrc aquí abajo*Paste your .lrc file text below*
+[00:04.20]Y presiona el botón "Cargar Letra"*And press the "Cargar Letra" button*
+[00:08.00]Carga tu audio y tu fondo para empezar a grabar
+[00:11.50]Oculta los controles cuando estés listo
+[00:15.00]`;
+
+  lrcInput.value = EXAMPLE_LRC;
+
+  // Si hay letra guardada de una sesión anterior, se antepone al ejemplo
+  try {
+    const savedLrc = localStorage.getItem(LRC_STORAGE_KEY);
+    if (savedLrc){
+      lrcInput.value = savedLrc;
+    }
+  } catch (err) {
+    // localStorage puede fallar en modo privado; se ignora y sigue con el ejemplo
+  }
+
+  // ---------- Parser LRC ----------
+  // Detecta texto entre asteriscos: "Letra en español*Letra en idioma original*"
+  const ASTERISK_EXP = /\*(.*?)\*/;
+
+  function splitBilingual(text, bilingualEnabled){
+    const match = text.match(ASTERISK_EXP);
+
+    if (!match){
+      return { textEs: text.trim(), textOriginal: '' };
+    }
+
+    if (!bilingualEnabled){
+      // Modo desactivado: se remueve el texto entre asteriscos, solo queda el español
+      return { textEs: text.replace(ASTERISK_EXP, '').trim(), textOriginal: '' };
+    }
+
+    const textEs = text.slice(0, match.index).trim();
+    const textOriginal = match[1].trim();
+    return { textEs, textOriginal };
+  }
+
+  function parseLRC(rawText, bilingualEnabled){
+    const timeTagExp = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+    const parsed = [];
+
+    rawText.split('\n').forEach(rawLine => {
+      const line = rawLine.trim();
+      if (!line) return;
+
+      const tags = [...line.matchAll(timeTagExp)];
+      if (tags.length === 0) return;
+
+      // Ya no se descarta si el texto queda vacío: una etiqueta de tiempo sin
+      // letra se conserva como línea "spacer" para limpiar el resaltado al final.
+      const rawContent = line.replace(timeTagExp, '').trim();
+      const { textEs, textOriginal } = splitBilingual(rawContent, bilingualEnabled);
+      const isSpacer = textEs === '' && textOriginal === '';
+
+      tags.forEach(tag => {
+        const minutes = parseInt(tag[1], 10);
+        const seconds = parseInt(tag[2], 10);
+        let fraction = tag[3] ? tag[3] : '0';
+        if (fraction.length === 1) fraction += '00';
+        if (fraction.length === 2) fraction += '0';
+        const ms = parseInt(fraction, 10);
+        const time = minutes * 60 + seconds + ms / 1000;
+        parsed.push({ time, textEs, textOriginal, isSpacer });
+      });
+    });
+
+    parsed.sort((a, b) => a.time - b.time);
+    return parsed;
+  }
+
+  // ---------- Metadatos del .lrc ([ti:] título / [ar:] artista) ----------
+  function parseLRCMeta(rawText){
+    const tiMatch = rawText.match(/\[ti\s*:\s*(.*?)\]/i);
+    const arMatch = rawText.match(/\[ar\s*:\s*(.*?)\]/i);
+    return {
+      title: tiMatch ? tiMatch[1].trim() : '',
+      artist: arMatch ? arMatch[1].trim() : ''
+    };
+  }
+
+  function applyTrackMeta(rawText){
+    const meta = parseLRCMeta(rawText);
+
+    trackTitleEl.textContent = meta.title;
+    trackTitleEl.classList.toggle('hidden-meta', !meta.title);
+
+    trackArtistEl.textContent = meta.artist;
+    trackArtistEl.classList.toggle('hidden-meta', !meta.artist);
+  }
+
+  // ---------- Render ----------
+  function renderLyrics(){
+    lyricsList.innerHTML = '';
+    lyricsData.forEach((item) => {
+      const div = document.createElement('div');
+      div.className = 'lyric-line';
+
+      if (item.isSpacer){
+        div.classList.add('spacer');
+        div.innerHTML = '&nbsp;';
+      } else {
+        const esSpan = document.createElement('span');
+        esSpan.className = 'line-es';
+        esSpan.textContent = item.textEs;
+        div.appendChild(esSpan);
+
+        if (item.textOriginal){
+          const originalSpan = document.createElement('span');
+          originalSpan.className = 'line-original';
+          originalSpan.textContent = item.textOriginal;
+          div.appendChild(originalSpan);
+        }
+      }
+
+      lyricsList.appendChild(div);
+    });
+    currentActiveIndex = -1;
+    lyricsList.style.transform = 'translateY(0px)';
+    updateLineDistances(currentActiveIndex);
+  }
+
+  function loadLyricsFromTextarea(){
+    lyricsData = parseLRC(lrcInput.value, bilingualToggle.checked);
+    applyTrackMeta(lrcInput.value);
+    renderLyrics();
+    positionTrackInfoBlock();
+
+    try {
+      localStorage.setItem(LRC_STORAGE_KEY, lrcInput.value);
+    } catch (err) {
+      // localStorage puede fallar en modo privado o sin espacio; no es crítico
+    }
+  }
+
+  // Posiciona el bloque de metadatos + barra de progreso exactamente 3 líneas
+  // por debajo de la línea activa. Como la línea activa siempre queda
+  // centrada verticalmente en el visor (ver centerActiveLine), esta posición
+  // es constante respecto al viewport y solo depende de la altura real de
+  // una línea de letra renderizada.
+  function positionTrackInfoBlock(){
+    const sampleLine = lyricsList.querySelector('.lyric-line:not(.spacer)') || lyricsList.querySelector('.lyric-line');
+    let lineHeight = 48; // valor de respaldo razonable si aún no hay líneas renderizadas
+    if (sampleLine){
+      const measured = sampleLine.getBoundingClientRect().height;
+      if (measured > 0) lineHeight = measured;
+    }
+
+    const vpRect = lyricsViewport.getBoundingClientRect();
+    const centerY = vpRect.top + vpRect.height / 2;
+    const maxTop = vpRect.top + vpRect.height * 0.94; // evita que se salga del encuadre en pantallas muy bajas
+    const top = Math.min(centerY + lineHeight * 2, maxTop);
+
+    trackInfoBlock.style.top = `${top}px`;
+  }
+
+  function centerActiveLine(){
+    const activeEl = lyricsList.children[currentActiveIndex];
+    if (!activeEl){
+      lyricsList.style.transform = 'translateY(0px)';
+      return;
+    }
+    const viewportHeight = lyricsViewport.clientHeight;
+    const offset = activeEl.offsetTop + activeEl.offsetHeight / 2 - viewportHeight / 2;
+    lyricsList.style.transform = `translateY(${-offset}px)`;
+  }
+
+  function setActiveLine(index){
+    const prevEl = lyricsList.children[currentActiveIndex];
+    if (prevEl) prevEl.classList.remove('active');
+
+    currentActiveIndex = index;
+
+    const activeEl = lyricsList.children[currentActiveIndex];
+    if (activeEl) activeEl.classList.add('active');
+
+    updateLineDistances(currentActiveIndex);
+    centerActiveLine();
+  }
+
+  // Desvanecimiento por distancia de línea (no por porcentaje de pantalla):
+  // así el efecto se nota siempre a partir de la misma cantidad de líneas
+  // de distancia, sin importar el tamaño de fuente o el recorte final del video.
+  //
+  // Es asimétrico a propósito: hacia ARRIBA se conserva el desvanecimiento
+  // original (gradual). Hacia ABAJO es mucho más agresivo, para que las
+  // letras se disuelvan por completo antes de tocar el bloque de metadatos
+  // y la barra de progreso fijados en la parte inferior del visor.
+  const FADE_STEPS_ABOVE = [
+    { opacity: 0.60, blur: 0.3 },  // distancia 1
+    { opacity: 0.40, blur: 0.6 },  // distancia 2
+    { opacity: 0.20, blur: 0.9 },  // distancia 3
+  ];
+  const FADE_BEYOND_ABOVE = { opacity: 0.1, blur: 1.2 }; // más allá de 3 líneas arriba
+
+  const FADE_STEPS_BELOW = [
+    { opacity: 0.30, blur: 0.4 },  // distancia 1 (debajo)
+    { opacity: 0.10, blur: 1.4 },  // distancia 2 (debajo)
+  ];
+  const FADE_BEYOND_BELOW = { opacity: 0.02, blur: 2.4}; // más allá de 2 líneas debajo: invisible
+
+  function updateLineDistances(activeIndex){
+    const children = lyricsList.children;
+    for (let i = 0; i < children.length; i++){
+      const el = children[i];
+
+      if (i === activeIndex){
+        el.style.opacity = '';
+        el.style.filter = '';
+        continue;
+      }
+
+      const signedDistance = i - activeIndex; // negativo = arriba, positivo = abajo
+      const distance = Math.abs(signedDistance);
+      let step;
+
+      if (signedDistance < 0){
+        step = distance <= 3 ? FADE_STEPS_ABOVE[distance - 1] : FADE_BEYOND_ABOVE;
+      } else {
+        step = distance <= 2 ? FADE_STEPS_BELOW[distance - 1] : FADE_BEYOND_BELOW;
+      }
+
+      el.style.opacity = step.opacity;
+      el.style.filter = `blur(${step.blur}px)`;
+    }
+  }
+
+  function findActiveIndex(currentTime){
+    let idx = -1;
+    for (let i = 0; i < lyricsData.length; i++){
+      if (lyricsData[i].time <= currentTime) idx = i;
+      else break;
+    }
+    return idx;
+  }
+
+  // ---------- Barra de progreso / tiempo ----------
+  function formatTime(seconds){
+    if (!isFinite(seconds) || seconds < 0) seconds = 0;
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function updateProgressUI(){
+    const duration = player.duration || 0;
+    const current = player.currentTime || 0;
+    const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+
+    progressFillEl.style.width = `${pct}%`;
+    progressTimeEl.textContent = formatTime(current);
+    progressDurationEl.textContent = formatTime(duration);
+  }
+
+  // ---------- Eventos de audio ----------
+  player.addEventListener('timeupdate', () => {
+    const idx = findActiveIndex(player.currentTime);
+    if (idx !== currentActiveIndex) setActiveLine(idx);
+    updateProgressUI();
+  });
+
+  player.addEventListener('seeked', () => {
+    const idx = findActiveIndex(player.currentTime);
+    setActiveLine(idx);
+    updateProgressUI();
+  });
+
+  player.addEventListener('loadedmetadata', updateProgressUI);
+  player.addEventListener('durationchange', updateProgressUI);
+
+  // ---------- Carga de archivos ----------
+  audioInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    player.src = url;
+    player.load();
+    player.classList.remove('audio-empty');
+  });
+
+  bgInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    backgroundLayer.classList.remove('empty');
+    backgroundLayer.style.backgroundImage = `url("${url}")`;
+  });
+
+  loadLyricsBtn.addEventListener('click', loadLyricsFromTextarea);
+  bilingualToggle.addEventListener('change', loadLyricsFromTextarea);
+
+  // ---------- Selector de fuente de letra ----------
+  const FONT_MAP = {
+    outfit: "'Outfit', 'Google Sans', sans-serif",
+    times: "'Times New Roman', Times, serif",
+    googlesans: "'Poppins', 'Google Sans', sans-serif",
+    chivomono: "'Chivo Mono', 'Courier New', monospace"
+  };
+
+  fontSwitcher.addEventListener('click', (e) => {
+    const btn = e.target.closest('.font-option');
+    if (!btn) return;
+
+    const fontKey = btn.dataset.font;
+    document.documentElement.style.setProperty('--font-lyrics', FONT_MAP[fontKey]);
+
+    fontSwitcher.querySelectorAll('.font-option').forEach((opt) => {
+      opt.classList.toggle('active', opt === btn);
+    });
+  });
+
+  // ---------- Ajustes de fondo (escala, posición, brillo, desenfoque) ----------
+  function updateBackgroundStyle(){
+    const scale = parseFloat(bgScaleInput.value);
+    const x = parseFloat(bgPosXInput.value);
+    const y = parseFloat(bgPosYInput.value);
+    const brightness = parseFloat(bgBrightnessInput.value);
+    const blur = parseFloat(bgBlurInput.value);
+
+    backgroundLayer.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    backgroundLayer.style.filter = `blur(${blur}px) brightness(${brightness})`;
+
+    bgScaleVal.textContent = scale.toFixed(2);
+    bgPosXVal.textContent = `${x}px`;
+    bgPosYVal.textContent = `${y}px`;
+    bgBrightnessVal.textContent = brightness.toFixed(2);
+    bgBlurVal.textContent = `${blur}px`;
+  }
+
+  [bgScaleInput, bgPosXInput, bgPosYInput, bgBrightnessInput, bgBlurInput].forEach((input) => {
+    input.addEventListener('input', updateBackgroundStyle);
+  });
+
+  updateBackgroundStyle();
+
+  // ---------- Controles de tiempo ----------
+  function seekBy(deltaSeconds){
+    if (!player.duration) {
+      player.currentTime = Math.max(0, player.currentTime + deltaSeconds);
+      return;
+    }
+    player.currentTime = Math.min(
+      Math.max(0, player.currentTime + deltaSeconds),
+      player.duration
+    );
+  }
+
+  back5Btn.addEventListener('click', (e) => { e.stopPropagation(); seekBy(-5); });
+  back1Btn.addEventListener('click', (e) => { e.stopPropagation(); seekBy(-1); });
+  fwd1Btn.addEventListener('click', (e) => { e.stopPropagation(); seekBy(1); });
+  fwd5Btn.addEventListener('click', (e) => { e.stopPropagation(); seekBy(5); });
+
+  // ---------- Play / Pause central ----------
+  function updatePlayPauseIcon(){
+    playPauseBtn.textContent = player.paused ? '▶' : '❚❚';
+  }
+
+  playPauseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (player.paused){
+      player.play();
+    } else {
+      player.pause();
+    }
+  });
+
+  player.addEventListener('play', updatePlayPauseIcon);
+  player.addEventListener('pause', updatePlayPauseIcon);
+  updatePlayPauseIcon();
+
+  // ---------- Desplazamiento táctil (scrubbing) ----------
+  let isDragging = false;
+  let dragMoved = false;
+  let dragStartY = 0;
+  let dragStartOffset = 0;
+  let wasPlayingBeforeDrag = false;
+
+  function getCurrentTranslateY(){
+    const matrix = new DOMMatrixReadOnly(window.getComputedStyle(lyricsList).transform);
+    return matrix.m42;
+  }
+
+  // Encuentra la línea más cercana al centro del visor dado un offset de
+  // desplazamiento, y la marca como activa (sin recentrar con transición,
+  // ya que el propio dedo/mouse está controlando la posición en ese momento).
+  function updateClosestLineFromOffset(offset){
+    const viewportHeight = lyricsViewport.clientHeight;
+    const children = lyricsList.children;
+    let closestIndex = -1;
+    let closestDist = Infinity;
+
+    for (let i = 0; i < children.length; i++){
+      const el = children[i];
+      const centerPos = el.offsetTop + el.offsetHeight / 2 + offset;
+      const dist = Math.abs(centerPos - viewportHeight / 2);
+      if (dist < closestDist){
+        closestDist = dist;
+        closestIndex = i;
+      }
+    }
+
+    if (closestIndex !== -1 && closestIndex !== currentActiveIndex){
+      const prevEl = lyricsList.children[currentActiveIndex];
+      if (prevEl) prevEl.classList.remove('active');
+      currentActiveIndex = closestIndex;
+      const activeEl = lyricsList.children[currentActiveIndex];
+      if (activeEl) activeEl.classList.add('active');
+      updateLineDistances(currentActiveIndex);
+    }
+    return closestIndex;
+  }
+
+  function startDrag(clientY){
+    isDragging = true;
+    dragMoved = false;
+    dragStartY = clientY;
+    dragStartOffset = getCurrentTranslateY();
+    wasPlayingBeforeDrag = !player.paused;
+    if (wasPlayingBeforeDrag) player.pause();
+    lyricsList.style.transition = 'none';
+  }
+
+  function moveDrag(clientY){
+    if (!isDragging) return;
+    const delta = clientY - dragStartY;
+    if (Math.abs(delta) > 6) dragMoved = true;
+
+    const newOffset = dragStartOffset + delta;
+    lyricsList.style.transform = `translateY(${newOffset}px)`;
+    updateClosestLineFromOffset(newOffset);
+  }
+
+  function endDrag(){
+    if (!isDragging) return;
+    isDragging = false;
+    lyricsList.style.transition = ''; // vuelve a usar la transición suave del CSS
+
+    const index = currentActiveIndex;
+    if (index !== -1 && lyricsData[index]){
+      player.currentTime = lyricsData[index].time;
+    }
+    setActiveLine(index); // recentra con la transición cubic-bezier y confirma el estado activo
+
+    if (wasPlayingBeforeDrag) player.play();
+  }
+
+  lyricsViewport.addEventListener('mousedown', (e) => startDrag(e.clientY));
+  window.addEventListener('mousemove', (e) => { if (isDragging) moveDrag(e.clientY); });
+  window.addEventListener('mouseup', () => { if (isDragging) endDrag(); });
+
+  lyricsViewport.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientY), { passive: true });
+  lyricsViewport.addEventListener('touchmove', (e) => {
+    if (isDragging){
+      e.preventDefault();
+      moveDrag(e.touches[0].clientY);
+    }
+  }, { passive: false });
+  lyricsViewport.addEventListener('touchend', () => endDrag());
+  lyricsViewport.addEventListener('touchcancel', () => endDrag());
+
+  // ---------- Modo grabación ----------
+  recordModeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.add('hidden');
+  });
+
+  document.addEventListener('click', () => {
+    if (dragMoved){
+      dragMoved = false; // ese "click" vino de un gesto de scrubbing, se ignora
+      return;
+    }
+    if (panel.classList.contains('hidden')){
+      panel.classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    centerActiveLine();
+    positionTrackInfoBlock();
+  });
+
+  // ---------- Estado inicial ----------
+  loadLyricsFromTextarea();
+  updateProgressUI();
+})();
+</script>
+</body>
+</html>
+
