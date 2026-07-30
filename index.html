@@ -1221,15 +1221,15 @@
         const pxToBlock = trackInfoTop - elRect.bottom;
 
         if (pxToBlock <= FADE_BELOW_START_PX){
-          el.style.opacity = 0.40;
-          el.style.filter = 'blur(0.6px)';
+          el.style.opacity = 0.02;
+          el.style.filter = 'blur(2.4px)';
         } else {
           // Interpola linealmente entre "recién pasó el umbral" (invisible)
           // y "lejos del bloque" (opacidad tenue normal, como el resto de
           // líneas no activas).
           const t = Math.min(1, (pxToBlock - FADE_BELOW_START_PX) / (FADE_BELOW_FULL_PX - FADE_BELOW_START_PX));
-          const opacity = 0.02 + t * (0.30 - 0.02);
-          const blur = 2.4 - t * (2.4 - 0.4);
+          const opacity = 0.20 + t * (0.60 - 0.20);
+          const blur = 0.6 - t * (0.6 - 0.2);
           el.style.opacity = opacity.toFixed(2);
           el.style.filter = `blur(${blur.toFixed(2)}px)`;
         }
