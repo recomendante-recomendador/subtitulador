@@ -1221,8 +1221,8 @@
         const pxToBlock = trackInfoTop - elRect.bottom;
 
         if (pxToBlock <= FADE_BELOW_START_PX){
-          el.style.opacity = 0.02;
-          el.style.filter = 'blur(2.4px)';
+          el.style.opacity = 0.40;
+          el.style.filter = 'blur(0.6px)';
         } else {
           // Interpola linealmente entre "recién pasó el umbral" (invisible)
           // y "lejos del bloque" (opacidad tenue normal, como el resto de
