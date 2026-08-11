@@ -105,7 +105,7 @@
     width: min(88vw, 600px);
     padding: 15vh 0;
     font-size: clamp(0.85rem, 3.8vmin, 2.05rem);
-    transition: transform 0.45s var(--ease-smooth);
+    transition: transform 0.65s var(--ease-smooth);
     will-change: transform;
   }
 
@@ -129,10 +129,10 @@
     filter: blur(1px);
     transform: scale(1);
     padding: 0.45em 0.4em;
-    transition: opacity 0.30s var(--ease-smooth),
-                filter 0.30s var(--ease-smooth),
-                transform 0.30s var(--ease-smooth),
-                text-shadow 0.30s var(--ease-smooth);
+    transition: opacity 0.45s var(--ease-smooth),
+                filter 0.45s var(--ease-smooth),
+                transform 0.45s var(--ease-smooth),
+                text-shadow 0.45s var(--ease-smooth);
     letter-spacing: -0.01em;
   }
 
@@ -185,7 +185,7 @@
   .background-vocal{
     font-size: 0.88em;
     opacity: 0.75;
-    transition: opacity 0.25s var(--ease-smooth), transform 0.40s var(--ease-smooth);
+    transition: opacity 0.30s var(--ease-smooth), transform 0.40s var(--ease-smooth);
   }
 
   /* Vocal de fondo en idioma original (venía de *texto* dentro de paréntesis):
@@ -193,7 +193,7 @@
   .background-vocal.original-language{
     font-size: 0.8em;
     opacity: 0.6;
-    transition: opacity 0.25s var(--ease-smooth), transform 0.40s var(--ease-smooth);
+    transition: opacity 0.30s var(--ease-smooth), transform 0.40s var(--ease-smooth);
   }
 
   /* Vocal de fondo con marca de tiempo propia (línea separada en el .lrc):
@@ -204,7 +204,7 @@
     transition: opacity 0.25s var(--ease-smooth), transform 0.35s var(--ease-smooth);
   }
   .timed-bg-vocal.pending .background-vocal{
-    opacity: 0.25;
+    opacity: 0.30;
     transform: scale(0.9);
   }
   .timed-bg-vocal.bg-active .background-vocal{
@@ -241,7 +241,7 @@
   }
 
   #lyricsList.two-column-mode .lyric-line .line-content{
-    transition: transform 0.25s var(--ease-smooth);
+    transition: transform 0.35s var(--ease-smooth);
   }
 
   /* El transform-origin se fija aquí (fuera de .active) para que sea el
