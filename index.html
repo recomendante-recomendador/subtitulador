@@ -134,6 +134,7 @@
                 transform 0.45s var(--ease-smooth),
                 text-shadow 0.45s var(--ease-smooth);
     letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
   /* El <b> dentro de una línea inactiva se pierde visualmente si solo
@@ -165,6 +166,7 @@
   /* Texto español dentro de una línea bilingüe */
   .line-es{
     display: block;
+    text-wrap: balance;
   }
 
   /* Texto en idioma original: secundario, más chico, más tenue */
@@ -176,6 +178,7 @@
     margin-top: 0.05em;   /* interlineado corto respecto a la línea en español */
     margin-bottom: 0.28em; /* espacio extra antes de la siguiente estrofa */
     letter-spacing: 0;
+    text-wrap: balance;
   }
 
   .lyric-line.active .line-original{
@@ -214,6 +217,7 @@
     font-size: 0.88em;
     opacity: 0.75;
     transition: opacity 0.30s var(--ease-smooth), transform 0.40s var(--ease-smooth);
+    text-wrap: balance;
   }
 
   /* Vocal de fondo en idioma original (venía de *texto* dentro de paréntesis):
