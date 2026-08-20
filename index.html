@@ -154,6 +154,7 @@
                 transform 0.45s var(--ease-smooth),
                 text-shadow 0.45s var(--ease-smooth);
     letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
   /* El <b> dentro de una línea inactiva se pierde visualmente si solo
@@ -185,6 +186,7 @@
   /* Texto español dentro de una línea bilingüe */
   .line-es{
     display: block;
+    text-wrap: balance;
   }
 
   /* Texto en idioma original: secundario, más chico, más tenue */
@@ -198,6 +200,7 @@
     margin-bottom: 0.28em; /* espacio extra antes de la siguiente estrofa */
     letter-spacing: 0;
     text-shadow: 0 0 14px rgba(var(--lyrics-glow-color-original), calc(var(--lyrics-glow-opacity) * 0.7));
+    text-wrap: balance;
   }
 
   .lyric-line.active .line-original{
@@ -242,6 +245,7 @@
     color: var(--lyrics-color-bg-es);
     text-shadow: 0 0 14px rgba(var(--lyrics-glow-color-bg-es), calc(var(--lyrics-glow-opacity) * 0.7));
     transition: opacity 0.30s var(--ease-smooth), transform 0.40s var(--ease-smooth);
+    text-wrap: balance;
   }
 
   /* Vocal de fondo en idioma original (venía de *texto* dentro de paréntesis):
